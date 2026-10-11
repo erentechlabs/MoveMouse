@@ -14,7 +14,7 @@ It is a fully unpackaged, self-contained WinUI 3 application: no MSIX installati
 
 - **Mouse jiggler** — periodically moves the cursor by a small amount to simulate user activity.
 - **Single Start/Stop toggle** — one button for both actions; its color, icon, and label (▶ *Start Jiggling* / ⏹ *Stop Jiggling*) always reflect what it will do next, so the dashboard never shows a redundant, permanently-disabled button.
-- **Horizontal, tabbed dashboard** — a wide WinUI 3 window with an always-visible status/control sidebar next to segmented **Movement** / **Behavior** tabs, so settings are grouped into focused pages instead of one long scrolling list.
+- **Horizontal, tabbed dashboard** — a wide WinUI 3 window with an always-visible status/control sidebar next to a centered, segmented **Movement** / **Behavior** tab bar, so settings are grouped into focused pages instead of one long scrolling list. The sidebar and the settings card always match height, so the two-panel layout stays visually symmetric no matter which tab is open.
 - **Translucent Mica backdrop** — the window background uses Windows 11's Mica material, with low-opacity "glass" panels layered on top, so the whole dashboard stays visually light and modern instead of flat and opaque.
 - **Configurable interval** — choose how often the cursor moves, from 1 second up to 1 hour.
 - **Multiple movement patterns**
@@ -33,15 +33,19 @@ It is a fully unpackaged, self-contained WinUI 3 application: no MSIX installati
 
 ## Screenshots
 
-| Light — Movement tab (stopped) | Light — Behavior tab (running) |
+| Light — Movement tab (stopped) | Light — Movement tab (running) |
 | --- | --- |
-| ![Stopped state, Movement tab](docs/screenshots/dashboard-stopped.png) | ![Running state, Behavior tab](docs/screenshots/dashboard-running.png) |
+| ![Stopped state, Movement tab](docs/screenshots/dashboard-stopped.png) | ![Running state, Movement tab](docs/screenshots/dashboard-running.png) |
 
-The status/control sidebar stays visible no matter which settings tab is
-open. Every settings row — in both tabs — shares the same two-column grid (a
-flexible label on the left, a fixed-width control right-aligned to the same
-edge), so each tab reads as one evenly balanced, symmetric list. The window
-follows the Windows light/dark theme automatically:
+The segmented **Movement** / **Behavior** tab bar is centered above the
+settings card, and the status/control sidebar on the left always matches
+that card's height — including after switching to the five-row **Behavior**
+tab — instead of stretching to fill the window or leaving a large empty gap
+under the Start/Stop button. Every settings row, in both tabs, shares the
+same two-column grid (a flexible label on the left, a fixed-width control
+right-aligned to the same edge), so each tab reads as one evenly balanced,
+symmetric list. The window follows the Windows light/dark theme
+automatically:
 
 ![Dark theme — Behavior tab](docs/screenshots/dashboard-dark.png)
 
@@ -97,7 +101,7 @@ Move Mouse follows a clean separation of concerns:
   - `ITrayIconService` (in `MoveMouse.Tray`) — owns the notification-area icon, menu, and balloon notifications.
 - **`ViewModels`** — `MainViewModel` (built with [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet)) coordinates the services and exposes bindable state/commands; it contains no direct Windows API calls.
 - **`App.xaml.cs`** — the composition root: constructs every service and the view model, and owns application lifetime (startup, exit, unhandled-exception safety net).
-- **UI (XAML)** — binds only to the view model via classic `{Binding}`; all visuals use the control's own theme-aware default styling plus a handful of explicit, low-opacity accent/panel tint colors chosen so the window's Mica backdrop shows through (see the note at the top of `MainWindow.xaml` — in this project's unpackaged deployment, several named theme resources are not reliably resolved at XAML load time, so the UI intentionally avoids depending on them). Every settings row shares one consistent two-column grid (flexible label, fixed-width right-aligned control) for a symmetric, evenly balanced layout within each tab; a pair of `ShowMovementTabCommand`/`ShowBehaviorTabCommand` relay commands and `IsMovementTabActive`/`IsBehaviorTabActive` properties drive the segmented pill tab bar. The window is sized through a DPI-aware helper so the layout looks correct at any Windows display scaling setting.
+- **UI (XAML)** — binds only to the view model via classic `{Binding}`; all visuals use the control's own theme-aware default styling plus a handful of explicit, low-opacity accent/panel tint colors chosen so the window's Mica backdrop shows through (see the note at the top of `MainWindow.xaml` — in this project's unpackaged deployment, several named theme resources are not reliably resolved at XAML load time, so the UI intentionally avoids depending on them). Every settings row shares one consistent two-column grid (flexible label, fixed-width right-aligned control) for a symmetric, evenly balanced layout within each tab; a pair of `ShowMovementTabCommand`/`ShowBehaviorTabCommand` relay commands and `IsMovementTabActive`/`IsBehaviorTabActive` properties drive the centered, segmented pill tab bar. The sidebar card and the settings card are laid out in the same Grid row, so ordinary auto-row-sizing (not a fixed height) keeps them exactly the same height at all times, including when switching between the shorter Movement tab and the taller Behavior tab. The window is sized through a DPI-aware helper so the layout looks correct at any Windows display scaling setting.
 
 ## Build instructions
 
@@ -158,7 +162,7 @@ This application was built and verified end-to-end on a real Windows machine:
 - `dotnet build` succeeds for both `Debug` and `Release`, `x64`, with zero warnings and zero errors.
 - The app launches, and the dashboard renders correctly with no exceptions, in both light and dark Windows theme.
 - **Start** engages the timer (verified by watching the "last moved at" timestamp advance on schedule) and **Stop** halts it immediately (verified by the timestamp freezing); the single toggle button correctly flips color/icon/label and the status dot/text in lockstep with the jiggler's actual running state — and continues to do so regardless of which settings tab is open.
-- The **Movement** / **Behavior** segmented tabs switch correctly in both directions, each showing its own settings without affecting the other, and without disturbing the always-visible sidebar.
+- The **Movement** / **Behavior** segmented tabs switch correctly in both directions, each showing its own settings without affecting the other, and without disturbing the always-visible sidebar; the sidebar card and the settings card are confirmed to always render at the same height, growing together when the taller, five-row Behavior tab is opened and shrinking together back on the three-row Movement tab.
 - Settings changes made in the UI are written to `settings.json` immediately and are reloaded correctly on the next launch.
 - The system tray icon appears with the correct icon/tooltip for each state, its right-click menu items match the running state, left-clicking it (or choosing "Open Move Mouse") restores the window, and its **Exit** command cleanly terminates the process.
 - Closing the window with "minimize to tray" enabled hides the window while the process keeps running in the background; the window can be restored from the tray.
