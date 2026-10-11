@@ -3,6 +3,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using MoveMouse.ViewModels;
+using System.Runtime.InteropServices;
 using Windows.Graphics;
 using WinRT.Interop;
 
@@ -54,7 +55,7 @@ public sealed partial class MainWindow : Window
                 // Missing/unreadable icon file should never prevent the window from showing.
             }
 
-            _appWindow.Resize(new SizeInt32(440, 700));
+            _appWindow.Resize(GetPhysicalSize(hwnd, 480, 780));
             _appWindow.Closing += OnAppWindowClosing;
 
             if (_appWindow.Presenter is OverlappedPresenter presenter)
@@ -96,5 +97,21 @@ public sealed partial class MainWindow : Window
     {
         _isExiting = true;
         Close();
+    }
+
+    [DllImport("user32.dll")]
+    private static extern int GetDpiForWindow(IntPtr hwnd);
+
+    /// <summary>
+    /// Converts a size expressed in DIPs (the same unit XAML Width/Margin/etc. use) to the
+    /// physical pixels <see cref="AppWindow.Resize"/> actually expects. Without this
+    /// conversion, on any display scaled above 100% the window — and therefore the
+    /// available layout space for its XAML content — ends up smaller than intended,
+    /// which is what previously caused settings rows to wrap/clip incorrectly.
+    /// </summary>
+    private static SizeInt32 GetPhysicalSize(IntPtr hwnd, int widthInDips, int heightInDips)
+    {
+        var scale = GetDpiForWindow(hwnd) / 96.0;
+        return new SizeInt32((int)(widthInDips * scale), (int)(heightInDips * scale));
     }
 }

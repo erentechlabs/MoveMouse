@@ -35,6 +35,12 @@ It is a fully unpackaged, self-contained WinUI 3 application: no MSIX installati
 | --- | --- |
 | ![Stopped state](docs/screenshots/dashboard-stopped.png) | ![Running state](docs/screenshots/dashboard-running.png) |
 
+Every settings row — Movement and Behavior alike — shares the same two-column
+grid (a flexible label on the left, a fixed-width control right-aligned to the
+same edge), so the whole list reads as one evenly balanced, symmetric surface:
+
+![Settings detail](docs/screenshots/dashboard-settings.png)
+
 > The application icon (shown below) is a simple, original design generated for this project — a cursor with motion lines on a Fluent-style gradient tile.
 >
 > ![Move Mouse icon](docs/screenshots/app-icon.png)
@@ -87,7 +93,7 @@ Move Mouse follows a clean separation of concerns:
   - `ITrayIconService` (in `MoveMouse.Tray`) — owns the notification-area icon, menu, and balloon notifications.
 - **`ViewModels`** — `MainViewModel` (built with [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet)) coordinates the services and exposes bindable state/commands; it contains no direct Windows API calls.
 - **`App.xaml.cs`** — the composition root: constructs every service and the view model, and owns application lifetime (startup, exit, unhandled-exception safety net).
-- **UI (XAML)** — binds only to the view model via classic `{Binding}`; all visuals use the control's own theme-aware default styling plus a handful of explicit, hardcoded accent/card colors (see the note at the top of `MainWindow.xaml` — in this project's unpackaged deployment, several named theme resources are not reliably resolved at XAML load time, so the UI intentionally avoids depending on them).
+- **UI (XAML)** — binds only to the view model via classic `{Binding}`; all visuals use the control's own theme-aware default styling plus a handful of explicit, hardcoded accent/card colors (see the note at the top of `MainWindow.xaml` — in this project's unpackaged deployment, several named theme resources are not reliably resolved at XAML load time, so the UI intentionally avoids depending on them). Every settings row shares one consistent two-column grid (flexible label, fixed-width right-aligned control) for a symmetric, evenly balanced layout, and the window is sized through a DPI-aware helper so that layout looks correct at any Windows display scaling setting.
 
 ## Build instructions
 
