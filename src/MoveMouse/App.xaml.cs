@@ -32,8 +32,10 @@ public partial class App : Application
         IPowerManagementService power = new PowerManagementService();
         IStartupService startup = new StartupService();
         ITrayIconService tray = new TrayIconService();
+        IScheduledPowerActionService scheduledAction = new ScheduledPowerActionService();
+        IPowerActionExecutor powerActionExecutor = new PowerActionExecutor();
 
-        _viewModel = new MainViewModel(jiggler, power, settingsService, startup, tray, dispatcherQueue);
+        _viewModel = new MainViewModel(jiggler, power, settingsService, startup, tray, scheduledAction, powerActionExecutor, dispatcherQueue);
         _viewModel.ExitRequested += OnExitRequested;
 
         _mainWindow = new MainWindow(_viewModel);

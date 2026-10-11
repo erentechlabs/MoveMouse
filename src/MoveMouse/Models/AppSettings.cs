@@ -37,6 +37,25 @@ public sealed class AppSettings
     /// <summary>Preferred app theme: "Default" follows the system theme.</summary>
     public string Theme { get; set; } = "Default";
 
+    /// <summary>When true, Move Mouse will shut down or sleep the PC on the configured schedule.</summary>
+    public bool ScheduledActionEnabled { get; set; }
+
+    /// <summary>Which power action the schedule performs.</summary>
+    public ScheduledActionType ScheduledActionType { get; set; } = ScheduledActionType.Sleep;
+
+    /// <summary>Whether the schedule fires at a fixed time each day or after a one-time countdown.</summary>
+    public ScheduledActionTriggerMode ScheduledActionTriggerMode { get; set; } = ScheduledActionTriggerMode.AtSpecificTime;
+
+    /// <summary>
+    /// For <see cref="Models.ScheduledActionTriggerMode.AtSpecificTime"/>: the time of day the
+    /// action runs, stored as minutes since midnight (0-1439) rather than
+    /// <see cref="TimeSpan"/> for simple, unambiguous JSON round-tripping.
+    /// </summary>
+    public int ScheduledActionTimeOfDayMinutes { get; set; } = 22 * 60;
+
+    /// <summary>For <see cref="Models.ScheduledActionTriggerMode.AfterCountdown"/>: minutes to count down before running.</summary>
+    public int ScheduledActionCountdownMinutes { get; set; } = 60;
+
     /// <summary>
     /// Returns a deep-enough copy for safe comparison/rollback purposes.
     /// </summary>
@@ -50,6 +69,11 @@ public sealed class AppSettings
         StartMinimizedToTray = StartMinimizedToTray,
         AutoStartJigglingOnLaunch = AutoStartJigglingOnLaunch,
         LaunchAtWindowsStartup = LaunchAtWindowsStartup,
-        Theme = Theme
+        Theme = Theme,
+        ScheduledActionEnabled = ScheduledActionEnabled,
+        ScheduledActionType = ScheduledActionType,
+        ScheduledActionTriggerMode = ScheduledActionTriggerMode,
+        ScheduledActionTimeOfDayMinutes = ScheduledActionTimeOfDayMinutes,
+        ScheduledActionCountdownMinutes = ScheduledActionCountdownMinutes
     };
 }

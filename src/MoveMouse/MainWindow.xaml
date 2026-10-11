@@ -40,10 +40,13 @@
             <SolidColorBrush x:Key="DividerBrush" Color="#22808080" />
             <SolidColorBrush x:Key="ErrorBannerBackgroundBrush" Color="#1FE81123" />
             <SolidColorBrush x:Key="ErrorBannerBorderBrush" Color="#55E81123" />
+            <SolidColorBrush x:Key="WarningBannerBackgroundBrush" Color="#26FFB900" />
+            <SolidColorBrush x:Key="WarningBannerBorderBrush" Color="#66FFB900" />
         </Grid.Resources>
 
         <Grid Margin="24" RowSpacing="16">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -90,6 +93,40 @@
             </Border>
 
             <!--
+                Scheduled-action warning banner: shown for the last 60 seconds
+                before a scheduled shutdown/sleep runs. By the time this is
+                visible, jiggling has already been stopped (see
+                MainViewModel.OnScheduleWarningStarted). Cancel here skips
+                today's run ("at a specific time") or turns the one-shot
+                "after a countdown" schedule off entirely.
+            -->
+            <Border
+                Grid.Row="2"
+                Background="{StaticResource WarningBannerBackgroundBrush}"
+                BorderBrush="{StaticResource WarningBannerBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="16,12"
+                Visibility="{Binding IsScheduleWarningActive, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        Grid.Column="0"
+                        Text="{Binding ScheduleWarningText}"
+                        TextWrapping="Wrap"
+                        VerticalAlignment="Center" />
+                    <Button
+                        Grid.Column="1"
+                        Content="Cancel"
+                        Command="{Binding CancelScheduledActionCommand}"
+                        VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!--
                 Main: fixed-width status/control sidebar + tabbed settings.
 
                 The sidebar card and the settings card are both placed in row 1 of
@@ -101,7 +138,7 @@
                 Movement (3 rows) and Behavior (5 rows) tabs. Row 0 holds only the
                 centered segmented tab bar, above the settings card.
             -->
-            <Grid Grid.Row="2" ColumnSpacing="20" RowSpacing="12" VerticalAlignment="Top">
+            <Grid Grid.Row="3" ColumnSpacing="20" RowSpacing="12" VerticalAlignment="Top">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="240" />
                     <ColumnDefinition Width="*" />
@@ -138,6 +175,14 @@
                             CornerRadius="6"
                             Padding="18,8"
                             AutomationProperties.Name="Behavior settings tab" />
+                        <Button
+                            Content="Schedule"
+                            Command="{Binding ShowScheduleTabCommand}"
+                            Background="{Binding IsScheduleTabActive, Converter={StaticResource BoolToTabBrushConverter}}"
+                            BorderThickness="0"
+                            CornerRadius="6"
+                            Padding="18,8"
+                            AutomationProperties.Name="Schedule settings tab" />
                     </StackPanel>
                 </Border>
 
@@ -337,12 +382,119 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+
+                    <Border
+                        Background="{StaticResource CardBackgroundBrush}"
+                        BorderBrush="{StaticResource CardBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="20"
+                        Visibility="{Binding IsScheduleTabActive, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel Spacing="14" VerticalAlignment="Top">
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="176" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Enable scheduled shutdown or sleep" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                <ToggleSwitch
+                                    Grid.Column="1"
+                                    IsOn="{Binding ScheduledActionEnabled, Mode=TwoWay}"
+                                    OnContent=""
+                                    OffContent=""
+                                    HorizontalAlignment="Right"
+                                    AutomationProperties.Name="Enable scheduled shutdown or sleep" />
+                            </Grid>
+
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="176" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Action" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                <ComboBox
+                                    Grid.Column="1"
+                                    Width="176"
+                                    MinWidth="0"
+                                    ItemsSource="{Binding ScheduledActionTypes}"
+                                    SelectedItem="{Binding SelectedScheduledActionType, Mode=TwoWay}"
+                                    DisplayMemberPath="DisplayName"
+                                    AutomationProperties.Name="Scheduled action" />
+                            </Grid>
+
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="176" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Run" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                <ComboBox
+                                    Grid.Column="1"
+                                    Width="176"
+                                    MinWidth="0"
+                                    ItemsSource="{Binding ScheduledActionTriggerModes}"
+                                    SelectedItem="{Binding SelectedScheduledActionTriggerMode, Mode=TwoWay}"
+                                    DisplayMemberPath="DisplayName"
+                                    AutomationProperties.Name="Schedule trigger mode" />
+                            </Grid>
+
+                            <Grid
+                                ColumnSpacing="16"
+                                Visibility="{Binding IsAtSpecificTimeMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Time of day" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                <TimePicker
+                                    Grid.Column="1"
+                                    Time="{Binding ScheduledActionTime, Mode=TwoWay}"
+                                    AutomationProperties.Name="Scheduled time of day" />
+                            </Grid>
+
+                            <Grid
+                                ColumnSpacing="16"
+                                Visibility="{Binding IsAfterCountdownMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="176" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Countdown (minutes)" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                <NumberBox
+                                    Grid.Column="1"
+                                    Width="176"
+                                    MinWidth="0"
+                                    Value="{Binding ScheduledActionCountdownMinutes, Mode=TwoWay}"
+                                    Minimum="1"
+                                    Maximum="1440"
+                                    SmallChange="5"
+                                    LargeChange="30"
+                                    SpinButtonPlacementMode="Compact"
+                                    AutomationProperties.Name="Countdown in minutes" />
+                            </Grid>
+
+                            <Border Height="1" Background="{StaticResource DividerBrush}" Margin="0,2" />
+
+                            <TextBlock
+                                Text="{Binding ScheduleStatusText}"
+                                FontSize="13"
+                                Opacity="0.85"
+                                TextWrapping="Wrap"
+                                AutomationProperties.Name="Schedule status" />
+
+                            <TextBlock
+                                Text="Move Mouse stops jiggling and shows a 60-second warning (with a Cancel option) before the scheduled action runs. The schedule only runs while Move Mouse is open, including minimized to the system tray."
+                                FontSize="11"
+                                Opacity="0.65"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </Grid>
 
             <!-- Footer -->
             <TextBlock
-                Grid.Row="3"
+                Grid.Row="4"
                 Text="Closing this window keeps Move Mouse running in the system tray (unless disabled in Behavior). Use the tray icon's Exit command to fully quit."
                 FontSize="11"
                 Opacity="0.65"

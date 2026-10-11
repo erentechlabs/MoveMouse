@@ -110,4 +110,20 @@ internal static class NativeMethods
     internal const uint ES_DISPLAY_REQUIRED = 0x00000002;
 
     #endregion
+
+    #region SetSuspendState (scheduled sleep)
+
+    /// <summary>
+    /// Suspends the system (sleep). Declared in powrprof.dll. Unlike
+    /// shutdown, this requires no external process and no special privilege
+    /// for the interactive user session that owns the console.
+    /// </summary>
+    [DllImport("powrprof.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetSuspendState(
+        [MarshalAs(UnmanagedType.Bool)] bool hibernate,
+        [MarshalAs(UnmanagedType.Bool)] bool forceCritical,
+        [MarshalAs(UnmanagedType.Bool)] bool disableWakeEvent);
+
+    #endregion
 }

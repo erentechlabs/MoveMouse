@@ -23,8 +23,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly ISettingsService _settingsService;
     private readonly IStartupService _startupService;
     private readonly ITrayIconService _trayIconService;
+    private readonly IScheduledPowerActionService _scheduledAction;
+    private readonly IPowerActionExecutor _powerActionExecutor;
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly AppSettings _settings;
+
+    /// <summary>Which action the currently-active warning countdown (if any) is for.</summary>
+    private ScheduledActionType _pendingWarningActionType;
 
     /// <summary>Guards against persisting/reconfiguring while initial values are being loaded from disk.</summary>
     private bool _isLoadingSettings = true;
@@ -34,6 +39,18 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         new MovementModeOption(MovementMode.RandomMovement, "Random movement"),
         new MovementModeOption(MovementMode.BackAndForth, "Back and forth"),
         new MovementModeOption(MovementMode.CircularNudge, "Circular nudge"),
+    };
+
+    public ObservableCollection<ScheduledActionTypeOption> ScheduledActionTypes { get; } = new()
+    {
+        new ScheduledActionTypeOption(ScheduledActionType.Sleep, "Sleep"),
+        new ScheduledActionTypeOption(ScheduledActionType.Shutdown, "Shut down"),
+    };
+
+    public ObservableCollection<ScheduledActionTriggerModeOption> ScheduledActionTriggerModes { get; } = new()
+    {
+        new ScheduledActionTriggerModeOption(ScheduledActionTriggerMode.AtSpecificTime, "At a specific time"),
+        new ScheduledActionTriggerModeOption(ScheduledActionTriggerMode.AfterCountdown, "After a countdown"),
     };
 
     [NotifyPropertyChangedFor(nameof(ToggleButtonText))]
@@ -80,6 +97,48 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial bool LaunchAtWindowsStartup { get; set; }
 
+    [ObservableProperty]
+    public partial bool ScheduledActionEnabled { get; set; }
+
+    [ObservableProperty]
+    public partial ScheduledActionTypeOption SelectedScheduledActionType { get; set; }
+
+    [NotifyPropertyChangedFor(nameof(IsAtSpecificTimeMode))]
+    [NotifyPropertyChangedFor(nameof(IsAfterCountdownMode))]
+    [ObservableProperty]
+    public partial ScheduledActionTriggerModeOption SelectedScheduledActionTriggerMode { get; set; }
+
+    /// <summary>The time of day the schedule runs, bound directly to a WinUI <c>TimePicker</c>.</summary>
+    [ObservableProperty]
+    public partial TimeSpan ScheduledActionTime { get; set; } = new(22, 0, 0);
+
+    [ObservableProperty]
+    public partial int ScheduledActionCountdownMinutes { get; set; } = 60;
+
+    /// <summary>True while the "At a specific time" row (the TimePicker) should be shown.</summary>
+    public bool IsAtSpecificTimeMode => SelectedScheduledActionTriggerMode?.Value == ScheduledActionTriggerMode.AtSpecificTime;
+
+    /// <summary>True while the "After a countdown" row (the countdown NumberBox) should be shown.</summary>
+    public bool IsAfterCountdownMode => SelectedScheduledActionTriggerMode?.Value == ScheduledActionTriggerMode.AfterCountdown;
+
+    /// <summary>Human-readable summary of the next scheduled run, or that none is scheduled.</summary>
+    [ObservableProperty]
+    public partial string ScheduleStatusText { get; set; } = "No scheduled shutdown or sleep.";
+
+    /// <summary>True while the pre-action warning banner (with its Cancel button) should be shown.</summary>
+    [ObservableProperty]
+    public partial bool IsScheduleWarningActive { get; set; }
+
+    [ObservableProperty]
+    public partial string ScheduleWarningText { get; set; } = string.Empty;
+
+    [RelayCommand]
+    private void CancelScheduledAction()
+    {
+        _scheduledAction.CancelPendingAction();
+        IsScheduleWarningActive = false;
+    }
+
     [NotifyPropertyChangedFor(nameof(HasError))]
     [ObservableProperty]
     public partial string? ErrorMessage { get; set; }
@@ -95,11 +154,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial bool IsBehaviorTabActive { get; set; }
 
+    /// <summary>True while the "Schedule" settings tab is the active one.</summary>
+    [ObservableProperty]
+    public partial bool IsScheduleTabActive { get; set; }
+
     [RelayCommand]
     private void ShowMovementTab()
     {
         IsMovementTabActive = true;
         IsBehaviorTabActive = false;
+        IsScheduleTabActive = false;
     }
 
     [RelayCommand]
@@ -107,6 +171,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         IsMovementTabActive = false;
         IsBehaviorTabActive = true;
+        IsScheduleTabActive = false;
+    }
+
+    [RelayCommand]
+    private void ShowScheduleTab()
+    {
+        IsMovementTabActive = false;
+        IsBehaviorTabActive = false;
+        IsScheduleTabActive = true;
     }
 
     /// <summary>Raised when the user chooses Exit from the window or tray menu.</summary>
@@ -121,6 +194,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ISettingsService settingsService,
         IStartupService startupService,
         ITrayIconService trayIconService,
+        IScheduledPowerActionService scheduledAction,
+        IPowerActionExecutor powerActionExecutor,
         DispatcherQueue dispatcherQueue)
     {
         _jiggler = jiggler;
@@ -128,6 +203,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _settingsService = settingsService;
         _startupService = startupService;
         _trayIconService = trayIconService;
+        _scheduledAction = scheduledAction;
+        _powerActionExecutor = powerActionExecutor;
         _dispatcherQueue = dispatcherQueue;
 
         _settings = _settingsService.Load();
@@ -141,12 +218,31 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         StartMinimizedToTray = _settings.StartMinimizedToTray;
         AutoStartJigglingOnLaunch = _settings.AutoStartJigglingOnLaunch;
         LaunchAtWindowsStartup = _settings.LaunchAtWindowsStartup;
+        ScheduledActionEnabled = _settings.ScheduledActionEnabled;
+        SelectedScheduledActionType = ScheduledActionTypes.FirstOrDefault(t => t.Value == _settings.ScheduledActionType) ?? ScheduledActionTypes[0];
+        SelectedScheduledActionTriggerMode = ScheduledActionTriggerModes.FirstOrDefault(t => t.Value == _settings.ScheduledActionTriggerMode) ?? ScheduledActionTriggerModes[0];
+        var clampedTimeOfDayMinutes = Math.Clamp(_settings.ScheduledActionTimeOfDayMinutes, 0, 24 * 60 - 1);
+        ScheduledActionTime = TimeSpan.FromMinutes(clampedTimeOfDayMinutes);
+        ScheduledActionCountdownMinutes = Math.Clamp(_settings.ScheduledActionCountdownMinutes, 1, 1440);
         _isLoadingSettings = false;
 
         _jiggler.Configure(IntervalSeconds, SelectedMovementMode.Value, MovementDistance);
         _jiggler.RunningStateChanged += OnJigglerRunningStateChanged;
         _jiggler.CursorMoved += OnJigglerCursorMoved;
         _jiggler.ErrorOccurred += OnJigglerError;
+
+        _scheduledAction.Configure(
+            ScheduledActionEnabled,
+            SelectedScheduledActionType.Value,
+            SelectedScheduledActionTriggerMode.Value,
+            clampedTimeOfDayMinutes,
+            ScheduledActionCountdownMinutes);
+        _scheduledAction.Tick += OnScheduleTick;
+        _scheduledAction.WarningStarted += OnScheduleWarningStarted;
+        _scheduledAction.WarningCancelled += OnScheduleWarningCancelled;
+        _scheduledAction.ActionDue += OnScheduleActionDue;
+        _scheduledAction.ScheduleAutoDisabled += OnScheduleAutoDisabled;
+        ScheduleStatusText = BuildScheduleStatusText();
 
         _trayIconService.OpenRequested += (_, _) => ShowWindowRequested?.Invoke(this, EventArgs.Empty);
         _trayIconService.StartRequested += (_, _) => Start();
@@ -224,6 +320,110 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _dispatcherQueue.TryEnqueue(() => ErrorMessage = message);
     }
 
+    private void OnScheduleTick(object? sender, EventArgs e)
+    {
+        _dispatcherQueue.TryEnqueue(() =>
+        {
+            ScheduleStatusText = BuildScheduleStatusText();
+            if (_scheduledAction.IsWarningActive)
+            {
+                ScheduleWarningText = BuildScheduleWarningText();
+            }
+        });
+    }
+
+    private void OnScheduleWarningStarted(object? sender, ScheduledActionType actionType)
+    {
+        _dispatcherQueue.TryEnqueue(() =>
+        {
+            _pendingWarningActionType = actionType;
+            IsScheduleWarningActive = true;
+            ScheduleWarningText = BuildScheduleWarningText();
+
+            // Stop jiggling (and restore normal power management) before the
+            // scheduled action runs, per the feature's whole purpose: never
+            // let the jiggler's own activity fight the shutdown/sleep it is
+            // about to trigger.
+            Stop();
+
+            _trayIconService.ShowBalloon("Move Mouse", ScheduleWarningText);
+        });
+    }
+
+    private void OnScheduleWarningCancelled(object? sender, EventArgs e)
+    {
+        _dispatcherQueue.TryEnqueue(() => IsScheduleWarningActive = false);
+    }
+
+    private void OnScheduleActionDue(object? sender, ScheduledActionType actionType)
+    {
+        _dispatcherQueue.TryEnqueue(() => ExecuteScheduledAction(actionType));
+    }
+
+    private void OnScheduleAutoDisabled(object? sender, EventArgs e)
+    {
+        // The service already turned its own internal "enabled" flag off
+        // (this only happens for the one-shot "after a countdown" mode, once
+        // it has fired or been cancelled); mirror that back into the bound
+        // toggle and persisted settings.
+        _dispatcherQueue.TryEnqueue(() => ScheduledActionEnabled = false);
+    }
+
+    /// <summary>Stops jiggling and performs the scheduled power action. Runs on the UI thread.</summary>
+    private void ExecuteScheduledAction(ScheduledActionType actionType)
+    {
+        IsScheduleWarningActive = false;
+        Stop();
+        SaveSettings();
+
+        if (!_powerActionExecutor.Execute(actionType))
+        {
+            ErrorMessage = actionType == ScheduledActionType.Shutdown
+                ? "Could not start the scheduled shutdown. You can shut down manually from the Start menu."
+                : "Could not put the PC to sleep for the scheduled task. You can sleep it manually from the Start menu.";
+        }
+    }
+
+    private string BuildScheduleStatusText()
+    {
+        if (!ScheduledActionEnabled || _scheduledAction.NextRunAt is not { } nextRun)
+        {
+            return "No scheduled shutdown or sleep.";
+        }
+
+        var actionWord = SelectedScheduledActionType.Value == ScheduledActionType.Shutdown ? "Shut down" : "Sleep";
+        var now = DateTimeOffset.Now;
+        var remaining = nextRun - now;
+        if (remaining < TimeSpan.Zero)
+        {
+            remaining = TimeSpan.Zero;
+        }
+
+        var remainingText = remaining.TotalHours >= 1
+            ? $"{(int)remaining.TotalHours}h {remaining.Minutes}m"
+            : $"{Math.Max(1, remaining.Minutes)}m";
+
+        if (SelectedScheduledActionTriggerMode.Value == ScheduledActionTriggerMode.AfterCountdown)
+        {
+            return $"{actionWord} scheduled in {remainingText} (around {nextRun:t}).";
+        }
+
+        var dayWord = nextRun.Date == now.Date
+            ? "today"
+            : nextRun.Date == now.Date.AddDays(1)
+                ? "tomorrow"
+                : nextRun.ToString("MMM d");
+
+        return $"{actionWord} scheduled for {dayWord} at {nextRun:t} (in {remainingText}).";
+    }
+
+    private string BuildScheduleWarningText()
+    {
+        var actionWord = _pendingWarningActionType == ScheduledActionType.Shutdown ? "Shutting down" : "Going to sleep";
+        var seconds = Math.Max(0, (int)Math.Ceiling(_scheduledAction.WarningRemaining.TotalSeconds));
+        return $"{actionWord} in {seconds}s to run your scheduled task. Move Mouse has stopped jiggling.";
+    }
+
     partial void OnIntervalSecondsChanged(int value) => ApplyJigglerConfigurationAndSave();
 
     partial void OnMovementDistanceChanged(int value) => ApplyJigglerConfigurationAndSave();
@@ -261,6 +461,42 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (!_startupService.SetRegistered(value))
         {
             ErrorMessage = "Could not update the Windows startup registration. Try running Move Mouse as the current user (not elevated).";
+        }
+
+        SaveSettings();
+    }
+
+    partial void OnScheduledActionEnabledChanged(bool value) => ApplyScheduleConfigurationAndSave();
+
+    partial void OnSelectedScheduledActionTypeChanged(ScheduledActionTypeOption value) => ApplyScheduleConfigurationAndSave();
+
+    partial void OnSelectedScheduledActionTriggerModeChanged(ScheduledActionTriggerModeOption value) => ApplyScheduleConfigurationAndSave();
+
+    partial void OnScheduledActionTimeChanged(TimeSpan value) => ApplyScheduleConfigurationAndSave();
+
+    partial void OnScheduledActionCountdownMinutesChanged(int value) => ApplyScheduleConfigurationAndSave();
+
+    private void ApplyScheduleConfigurationAndSave()
+    {
+        if (_isLoadingSettings)
+        {
+            return;
+        }
+
+        try
+        {
+            var timeOfDayMinutes = (int)ScheduledActionTime.TotalMinutes;
+            _scheduledAction.Configure(
+                ScheduledActionEnabled,
+                SelectedScheduledActionType.Value,
+                SelectedScheduledActionTriggerMode.Value,
+                timeOfDayMinutes,
+                ScheduledActionCountdownMinutes);
+            ScheduleStatusText = BuildScheduleStatusText();
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            ErrorMessage = ex.Message;
         }
 
         SaveSettings();
@@ -304,6 +540,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _settings.StartMinimizedToTray = StartMinimizedToTray;
         _settings.AutoStartJigglingOnLaunch = AutoStartJigglingOnLaunch;
         _settings.LaunchAtWindowsStartup = LaunchAtWindowsStartup;
+        _settings.ScheduledActionEnabled = ScheduledActionEnabled;
+        _settings.ScheduledActionType = SelectedScheduledActionType.Value;
+        _settings.ScheduledActionTriggerMode = SelectedScheduledActionTriggerMode.Value;
+        _settings.ScheduledActionTimeOfDayMinutes = (int)ScheduledActionTime.TotalMinutes;
+        _settings.ScheduledActionCountdownMinutes = ScheduledActionCountdownMinutes;
         _settingsService.Save(_settings);
     }
 
@@ -321,6 +562,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _jiggler.CursorMoved -= OnJigglerCursorMoved;
         _jiggler.ErrorOccurred -= OnJigglerError;
         _jiggler.Dispose();
+
+        _scheduledAction.Tick -= OnScheduleTick;
+        _scheduledAction.WarningStarted -= OnScheduleWarningStarted;
+        _scheduledAction.WarningCancelled -= OnScheduleWarningCancelled;
+        _scheduledAction.ActionDue -= OnScheduleActionDue;
+        _scheduledAction.ScheduleAutoDisabled -= OnScheduleAutoDisabled;
+        _scheduledAction.Dispose();
+
         _trayIconService.Dispose();
     }
 }
