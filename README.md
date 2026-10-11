@@ -13,7 +13,7 @@ It is a fully unpackaged, self-contained WinUI 3 application: no MSIX installati
 ## Features
 
 - **Mouse jiggler** — periodically moves the cursor by a small amount to simulate user activity.
-- **Start / Stop controls** — two clearly labeled, always-accessible buttons; the enabled one always matches the current state.
+- **Single Start/Stop toggle** — one button for both actions; its color, icon, and label (▶ *Start Jiggling* / ⏹ *Stop Jiggling*) always reflect what it will do next, so the dashboard never shows a redundant, permanently-disabled button.
 - **Configurable interval** — choose how often the cursor moves, from 1 second up to 1 hour.
 - **Multiple movement patterns**
   - **Random movement** — small, unpredictable nudges in any direction.
@@ -120,8 +120,8 @@ Replace `win-x64` with `win-arm64` for ARM64 devices.
 ## Usage
 
 1. Launch `MoveMouse.exe`.
-2. Press **Start** to begin jiggling — the status dot turns green, Windows is told to stay awake, and the cursor will move by the configured amount at the configured interval.
-3. Press **Stop** at any time — the timer stops and normal Windows power management is restored immediately.
+2. Click **Start Jiggling** to begin — the status dot turns green, the button itself turns red and relabels to **Stop Jiggling**, Windows is told to stay awake, and the cursor will move by the configured amount at the configured interval.
+3. Click the same button (now **Stop Jiggling**) at any time — the timer stops and normal Windows power management is restored immediately.
 4. Adjust **Movement settings** (interval, pattern, distance) at any time, whether running or stopped; changes apply immediately and are saved automatically.
 5. Adjust **Behavior** options:
    - *Keep the display on while running* — also prevents the monitor from turning off, not just the system from sleeping.
@@ -136,7 +136,7 @@ Settings are stored in `%LOCALAPPDATA%\MoveMouse\settings.json`.
 
 ## How sleep prevention works
 
-Move Mouse calls the Win32 [`SetThreadExecutionState`](https://learn.microsoft.com/windows/win32/api/winbase/nf-winbase-setthreadexecutionstate) API with `ES_CONTINUOUS | ES_SYSTEM_REQUIRED` (and optionally `ES_DISPLAY_REQUIRED`) when you press **Start**, and resets it to `ES_CONTINUOUS` alone — restoring normal behavior — when you press **Stop**, when the app exits, or if it encounters an unhandled error. Because this flag is tied to the application's UI thread for as long as the process runs, there is no need to re-issue the call on every tick.
+Move Mouse calls the Win32 [`SetThreadExecutionState`](https://learn.microsoft.com/windows/win32/api/winbase/nf-winbase-setthreadexecutionstate) API with `ES_CONTINUOUS | ES_SYSTEM_REQUIRED` (and optionally `ES_DISPLAY_REQUIRED`) when you start jiggling, and resets it to `ES_CONTINUOUS` alone — restoring normal behavior — when you stop jiggling, when the app exits, or if it encounters an unhandled error. Because this flag is tied to the application's UI thread for as long as the process runs, there is no need to re-issue the call on every tick.
 
 Cursor movement itself is generated with [`SendInput`](https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-sendinput), the modern, Microsoft-recommended replacement for the legacy `mouse_event` API, using small relative moves that are clamped to the virtual screen bounds so the cursor never flies off-screen.
 
@@ -146,7 +146,7 @@ This application was built and verified end-to-end on a real Windows machine:
 
 - `dotnet build` succeeds for both `Debug` and `Release`, `x64`, with zero warnings and zero errors.
 - The app launches, and the dashboard renders correctly with no exceptions.
-- **Start** engages the timer (verified by watching the "last moved at" timestamp advance on schedule) and **Stop** halts it immediately (verified by the timestamp freezing).
+- **Start** engages the timer (verified by watching the "last moved at" timestamp advance on schedule) and **Stop** halts it immediately (verified by the timestamp freezing); the single toggle button correctly flips color/icon/label and the status dot/text in lockstep with the jiggler's actual running state.
 - Settings changes made in the UI are written to `settings.json` immediately and are reloaded correctly on the next launch.
 - The system tray icon appears with the correct icon/tooltip for each state, its right-click menu items match the running state, left-clicking it restores the window, and its **Exit** command cleanly terminates the process.
 - Closing the window with "minimize to tray" enabled hides the window while the process keeps running in the background; the window can be restored from the tray.

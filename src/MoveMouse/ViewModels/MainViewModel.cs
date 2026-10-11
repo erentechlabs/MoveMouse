@@ -36,14 +36,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         new MovementModeOption(MovementMode.CircularNudge, "Circular nudge"),
     };
 
-    [NotifyCanExecuteChangedFor(nameof(StartCommand))]
-    [NotifyCanExecuteChangedFor(nameof(StopCommand))]
-    [NotifyPropertyChangedFor(nameof(IsStopped))]
+    [NotifyPropertyChangedFor(nameof(ToggleButtonText))]
+    [NotifyPropertyChangedFor(nameof(ToggleButtonGlyph))]
     [ObservableProperty]
     public partial bool IsRunning { get; set; }
 
-    /// <summary>Convenience negation of <see cref="IsRunning"/> for simple XAML bindings.</summary>
-    public bool IsStopped => !IsRunning;
+    /// <summary>Label for the single Start/Stop toggle button, reflecting the current state.</summary>
+    public string ToggleButtonText => IsRunning ? "Stop Jiggling" : "Start Jiggling";
+
+    /// <summary>Segoe MDL2 Assets glyph for the toggle button (stop square / play triangle).</summary>
+    public string ToggleButtonGlyph => IsRunning ? "\uE71A" : "\uE768";
 
     [ObservableProperty]
     public partial string StatusText { get; set; } = "Stopped";
@@ -125,8 +127,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _jiggler.ErrorOccurred += OnJigglerError;
 
         _trayIconService.OpenRequested += (_, _) => ShowWindowRequested?.Invoke(this, EventArgs.Empty);
-        _trayIconService.StartRequested += (_, _) => StartCommand.Execute(null);
-        _trayIconService.StopRequested += (_, _) => StopCommand.Execute(null);
+        _trayIconService.StartRequested += (_, _) => Start();
+        _trayIconService.StopRequested += (_, _) => Stop();
         _trayIconService.ExitRequested += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
         _trayIconService.Initialize();
     }
@@ -134,13 +136,26 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Applies <see cref="AppSettings.AutoStartJigglingOnLaunch"/>. Called once after the window is ready.</summary>
     public void ApplyAutoStart()
     {
-        if (AutoStartJigglingOnLaunch && StartCommand.CanExecute(null))
+        if (AutoStartJigglingOnLaunch && !IsRunning)
         {
-            StartCommand.Execute(null);
+            Start();
         }
     }
 
-    [RelayCommand(CanExecute = nameof(CanStart))]
+    /// <summary>Toggles between jiggling and stopped. Bound to the single Start/Stop button and the tray menu.</summary>
+    [RelayCommand]
+    private void ToggleJiggling()
+    {
+        if (IsRunning)
+        {
+            Stop();
+        }
+        else
+        {
+            Start();
+        }
+    }
+
     private void Start()
     {
         ErrorMessage = null;
@@ -152,9 +167,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    private bool CanStart() => !IsRunning;
-
-    [RelayCommand(CanExecute = nameof(CanStop))]
     private void Stop()
     {
         _jiggler.Stop();
@@ -163,8 +175,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             ErrorMessage = "Windows did not confirm the restore-power-management request.";
         }
     }
-
-    private bool CanStop() => IsRunning;
 
     [RelayCommand]
     private void DismissError() => ErrorMessage = null;
