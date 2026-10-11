@@ -1,0 +1,200 @@
+<Window
+    x:Class="MoveMouse.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:converters="using:MoveMouse.Converters"
+    mc:Ignorable="d">
+
+    <!--
+        Note on styling: this window intentionally avoids named theme/static style
+        resources (e.g. TitleTextBlockStyle, AccentButtonStyle, CardBackgroundFillColorDefaultBrush).
+        In this project's unpackaged deployment model those named lookups are not
+        reliably resolved at XAML load time and throw XamlParseException, even though
+        the same key names are standard, documented WinUI 3 resources. Every control
+        below instead either uses its implicit default style (no Style attribute, which
+        resolves correctly via the framework's built-in per-type styles) or explicit,
+        hardcoded property values. This renders identically and still adapts to the
+        system light/dark theme because the built-in control styles themselves are
+        theme-aware; only the few custom colors below are fixed.
+    -->
+    <Grid x:Name="RootGrid">
+        <Grid.Resources>
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            <converters:BoolToStatusBrushConverter x:Key="BoolToStatusBrushConverter" />
+
+            <SolidColorBrush x:Key="CardBackgroundBrush" Color="#14808080" />
+            <SolidColorBrush x:Key="CardBorderBrush" Color="#29808080" />
+            <SolidColorBrush x:Key="ErrorBannerBackgroundBrush" Color="#1FE81123" />
+            <SolidColorBrush x:Key="ErrorBannerBorderBrush" Color="#55E81123" />
+            <SolidColorBrush x:Key="AccentBrush" Color="#0078D4" />
+        </Grid.Resources>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel
+                MaxWidth="520"
+                Margin="28,24,28,28"
+                Spacing="16"
+                HorizontalAlignment="Stretch">
+
+                <!-- Header -->
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Image Source="Assets/AppIcon.png" Width="36" Height="36" />
+                    <StackPanel VerticalAlignment="Center" Spacing="0">
+                        <TextBlock Text="Move Mouse" FontSize="26" FontWeight="SemiBold" />
+                        <TextBlock
+                            Text="Keeps your PC awake with light, configurable cursor activity."
+                            FontSize="12"
+                            Opacity="0.8" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Error / warning banner (hand-built instead of InfoBar, see styling note above) -->
+                <Border
+                    Background="{StaticResource ErrorBannerBackgroundBrush}"
+                    BorderBrush="{StaticResource ErrorBannerBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="16,12"
+                    Visibility="{Binding HasError, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            Grid.Column="0"
+                            Text="{Binding ErrorMessage}"
+                            TextWrapping="Wrap"
+                            VerticalAlignment="Center" />
+                        <Button
+                            Grid.Column="1"
+                            Content="Dismiss"
+                            Command="{Binding DismissErrorCommand}"
+                            VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+
+                <!-- Status card -->
+                <Border
+                    Background="{StaticResource CardBackgroundBrush}"
+                    BorderBrush="{StaticResource CardBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="20">
+                    <StackPanel Spacing="14">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Ellipse
+                                Width="14"
+                                Height="14"
+                                VerticalAlignment="Center"
+                                Fill="{Binding IsRunning, Converter={StaticResource BoolToStatusBrushConverter}}" />
+                            <TextBlock Text="{Binding StatusText}" FontSize="18" FontWeight="SemiBold" />
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding StatusDetailText}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding LastMovedText}" FontSize="12" Opacity="0.8" />
+
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Button
+                                Content="Start"
+                                Command="{Binding StartCommand}"
+                                Background="{StaticResource AccentBrush}"
+                                Foreground="White"
+                                MinWidth="128"
+                                AutomationProperties.Name="Start mouse jiggling" />
+                            <Button
+                                Content="Stop"
+                                Command="{Binding StopCommand}"
+                                MinWidth="128"
+                                AutomationProperties.Name="Stop mouse jiggling" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Movement settings -->
+                <TextBlock Text="Movement settings" FontSize="14" FontWeight="SemiBold" Margin="4,8,0,0" />
+                <Border
+                    Background="{StaticResource CardBackgroundBrush}"
+                    BorderBrush="{StaticResource CardBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="20">
+                    <StackPanel Spacing="16">
+                        <NumberBox
+                            Header="Jiggle interval (seconds)"
+                            Value="{Binding IntervalSeconds, Mode=TwoWay}"
+                            Minimum="1"
+                            Maximum="3600"
+                            SmallChange="5"
+                            LargeChange="30"
+                            SpinButtonPlacementMode="Inline"
+                            AutomationProperties.Name="Jiggle interval in seconds" />
+
+                        <ComboBox
+                            Header="Movement pattern"
+                            ItemsSource="{Binding MovementModes}"
+                            SelectedItem="{Binding SelectedMovementMode, Mode=TwoWay}"
+                            DisplayMemberPath="DisplayName"
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.Name="Movement pattern" />
+
+                        <NumberBox
+                            Header="Movement distance (pixels)"
+                            Value="{Binding MovementDistance, Mode=TwoWay}"
+                            Minimum="1"
+                            Maximum="100"
+                            SmallChange="1"
+                            LargeChange="10"
+                            SpinButtonPlacementMode="Inline"
+                            AutomationProperties.Name="Movement distance in pixels" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Behavior settings -->
+                <TextBlock Text="Behavior" FontSize="14" FontWeight="SemiBold" Margin="4,8,0,0" />
+                <Border
+                    Background="{StaticResource CardBackgroundBrush}"
+                    BorderBrush="{StaticResource CardBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="20">
+                    <StackPanel Spacing="12">
+                        <ToggleSwitch
+                            Header="Keep the display on while running"
+                            IsOn="{Binding KeepDisplayOn, Mode=TwoWay}"
+                            OnContent="On"
+                            OffContent="Off" />
+                        <ToggleSwitch
+                            Header="Minimize to the system tray when closing the window"
+                            IsOn="{Binding MinimizeToTrayOnClose, Mode=TwoWay}"
+                            OnContent="On"
+                            OffContent="Off" />
+                        <ToggleSwitch
+                            Header="Start minimized to the system tray"
+                            IsOn="{Binding StartMinimizedToTray, Mode=TwoWay}"
+                            OnContent="On"
+                            OffContent="Off" />
+                        <ToggleSwitch
+                            Header="Start jiggling automatically when the app launches"
+                            IsOn="{Binding AutoStartJigglingOnLaunch, Mode=TwoWay}"
+                            OnContent="On"
+                            OffContent="Off" />
+                        <ToggleSwitch
+                            Header="Launch Move Mouse when I sign in to Windows"
+                            IsOn="{Binding LaunchAtWindowsStartup, Mode=TwoWay}"
+                            OnContent="On"
+                            OffContent="Off" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock
+                    Text="Closing this window keeps Move Mouse running in the system tray (unless disabled above). Use the tray icon's Exit command to fully quit."
+                    FontSize="12"
+                    Opacity="0.7"
+                    TextWrapping="Wrap"
+                    Margin="4,8,4,0" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

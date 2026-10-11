@@ -1,0 +1,20 @@
+<Application
+    x:Class="MoveMouse.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Microsoft.UI.Xaml.Controls">
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!--
+                    Required in this unpackaged deployment model: without this explicit merge,
+                    several built-in control templates (ComboBox, InfoBar, and the semantic
+                    "fill color"/"card" brushes) fail to resolve resource keys such as
+                    TabViewButtonBackground at XAML load time and crash with XamlParseException.
+                -->
+                <controls:XamlControlsResources />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

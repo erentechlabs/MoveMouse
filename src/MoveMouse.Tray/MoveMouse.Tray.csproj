@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Isolated from the main MoveMouse.csproj on purpose: the .NET SDK's WPF/WinForms
+    markup-compile pipeline (brought in by UseWindowsForms) conflicts with the WinUI 3
+    XAML compiler (brought in by UseWinUI) when both flags are set on the same project
+    (build fails with MC6000). WinUI 3 has no built-in notification-area API, so this
+    small library provides one using System.Windows.Forms.NotifyIcon, kept separate
+    from the WinUI 3 UI project.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>MoveMouse.Tray</RootNamespace>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+</Project>
