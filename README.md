@@ -1,6 +1,6 @@
 # Move Mouse
 
-A modern, native Windows desktop application that gently simulates mouse activity to keep your PC from going to sleep, locking, or dimming the display — built with **C#**, **.NET**, and **WinUI 3** following Windows 11 Fluent Design.
+A modern, native Windows desktop application that gently simulates mouse activity to keep your PC from going to sleep, locking, or dimming the display — built with **C#**, **.NET**, and **WinUI 3** following Windows 11 Fluent Design, with a wide, tabbed dashboard and a translucent Mica backdrop.
 
 ![Move Mouse — running state](docs/screenshots/dashboard-running.png)
 
@@ -14,6 +14,8 @@ It is a fully unpackaged, self-contained WinUI 3 application: no MSIX installati
 
 - **Mouse jiggler** — periodically moves the cursor by a small amount to simulate user activity.
 - **Single Start/Stop toggle** — one button for both actions; its color, icon, and label (▶ *Start Jiggling* / ⏹ *Stop Jiggling*) always reflect what it will do next, so the dashboard never shows a redundant, permanently-disabled button.
+- **Horizontal, tabbed dashboard** — a wide WinUI 3 window with an always-visible status/control sidebar next to segmented **Movement** / **Behavior** tabs, so settings are grouped into focused pages instead of one long scrolling list.
+- **Translucent Mica backdrop** — the window background uses Windows 11's Mica material, with low-opacity "glass" panels layered on top, so the whole dashboard stays visually light and modern instead of flat and opaque.
 - **Configurable interval** — choose how often the cursor moves, from 1 second up to 1 hour.
 - **Multiple movement patterns**
   - **Random movement** — small, unpredictable nudges in any direction.
@@ -31,15 +33,17 @@ It is a fully unpackaged, self-contained WinUI 3 application: no MSIX installati
 
 ## Screenshots
 
-| Stopped | Running |
+| Light — Movement tab (stopped) | Light — Behavior tab (running) |
 | --- | --- |
-| ![Stopped state](docs/screenshots/dashboard-stopped.png) | ![Running state](docs/screenshots/dashboard-running.png) |
+| ![Stopped state, Movement tab](docs/screenshots/dashboard-stopped.png) | ![Running state, Behavior tab](docs/screenshots/dashboard-running.png) |
 
-Every settings row — Movement and Behavior alike — shares the same two-column
-grid (a flexible label on the left, a fixed-width control right-aligned to the
-same edge), so the whole list reads as one evenly balanced, symmetric surface:
+The status/control sidebar stays visible no matter which settings tab is
+open. Every settings row — in both tabs — shares the same two-column grid (a
+flexible label on the left, a fixed-width control right-aligned to the same
+edge), so each tab reads as one evenly balanced, symmetric list. The window
+follows the Windows light/dark theme automatically:
 
-![Settings detail](docs/screenshots/dashboard-settings.png)
+![Dark theme — Behavior tab](docs/screenshots/dashboard-dark.png)
 
 > The application icon (shown below) is a simple, original design generated for this project — a cursor with motion lines on a Fluent-style gradient tile.
 >
@@ -93,7 +97,7 @@ Move Mouse follows a clean separation of concerns:
   - `ITrayIconService` (in `MoveMouse.Tray`) — owns the notification-area icon, menu, and balloon notifications.
 - **`ViewModels`** — `MainViewModel` (built with [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet)) coordinates the services and exposes bindable state/commands; it contains no direct Windows API calls.
 - **`App.xaml.cs`** — the composition root: constructs every service and the view model, and owns application lifetime (startup, exit, unhandled-exception safety net).
-- **UI (XAML)** — binds only to the view model via classic `{Binding}`; all visuals use the control's own theme-aware default styling plus a handful of explicit, hardcoded accent/card colors (see the note at the top of `MainWindow.xaml` — in this project's unpackaged deployment, several named theme resources are not reliably resolved at XAML load time, so the UI intentionally avoids depending on them). Every settings row shares one consistent two-column grid (flexible label, fixed-width right-aligned control) for a symmetric, evenly balanced layout, and the window is sized through a DPI-aware helper so that layout looks correct at any Windows display scaling setting.
+- **UI (XAML)** — binds only to the view model via classic `{Binding}`; all visuals use the control's own theme-aware default styling plus a handful of explicit, low-opacity accent/panel tint colors chosen so the window's Mica backdrop shows through (see the note at the top of `MainWindow.xaml` — in this project's unpackaged deployment, several named theme resources are not reliably resolved at XAML load time, so the UI intentionally avoids depending on them). Every settings row shares one consistent two-column grid (flexible label, fixed-width right-aligned control) for a symmetric, evenly balanced layout within each tab; a pair of `ShowMovementTabCommand`/`ShowBehaviorTabCommand` relay commands and `IsMovementTabActive`/`IsBehaviorTabActive` properties drive the segmented pill tab bar. The window is sized through a DPI-aware helper so the layout looks correct at any Windows display scaling setting.
 
 ## Build instructions
 
@@ -126,17 +130,18 @@ Replace `win-x64` with `win-arm64` for ARM64 devices.
 ## Usage
 
 1. Launch `MoveMouse.exe`.
-2. Click **Start Jiggling** to begin — the status dot turns green, the button itself turns red and relabels to **Stop Jiggling**, Windows is told to stay awake, and the cursor will move by the configured amount at the configured interval.
+2. Click **Start Jiggling** (in the left sidebar) to begin — the status dot turns green, the button itself turns red and relabels to **Stop Jiggling**, Windows is told to stay awake, and the cursor will move by the configured amount at the configured interval. The sidebar is always visible, so you can start/stop from either settings tab.
 3. Click the same button (now **Stop Jiggling**) at any time — the timer stops and normal Windows power management is restored immediately.
-4. Adjust **Movement settings** (interval, pattern, distance) at any time, whether running or stopped; changes apply immediately and are saved automatically.
-5. Adjust **Behavior** options:
+4. Use the **Movement** / **Behavior** segmented tabs above the settings panel to switch between the two groups below.
+5. On the **Movement** tab, adjust the interval, pattern, and distance at any time, whether running or stopped; changes apply immediately and are saved automatically.
+6. On the **Behavior** tab, adjust:
    - *Keep the display on while running* — also prevents the monitor from turning off, not just the system from sleeping.
    - *Minimize to the system tray when closing the window* — clicking the window's **X** hides it instead of exiting; Move Mouse keeps running in the background.
    - *Start minimized to the system tray* — skip showing the window on launch.
    - *Start jiggling automatically when the app launches* — begin jiggling immediately on startup.
    - *Launch Move Mouse when I sign in to Windows* — registers/unregisters a per-user startup entry.
-6. Use the **system tray icon** to reopen the window (click), or right-click it for **Open Move Mouse**, **Start/Stop Jiggling**, and **Exit**.
-7. Choose **Exit** from the tray menu (or disable "minimize to tray" and close the window) to fully quit — this always stops jiggling and restores normal power management first.
+7. Use the **system tray icon** to reopen the window (click), or right-click it for **Open Move Mouse**, **Start/Stop Jiggling**, and **Exit**.
+8. Choose **Exit** from the tray menu (or disable "minimize to tray" and close the window) to fully quit — this always stops jiggling and restores normal power management first.
 
 Settings are stored in `%LOCALAPPDATA%\MoveMouse\settings.json`.
 
@@ -151,10 +156,11 @@ Cursor movement itself is generated with [`SendInput`](https://learn.microsoft.c
 This application was built and verified end-to-end on a real Windows machine:
 
 - `dotnet build` succeeds for both `Debug` and `Release`, `x64`, with zero warnings and zero errors.
-- The app launches, and the dashboard renders correctly with no exceptions.
-- **Start** engages the timer (verified by watching the "last moved at" timestamp advance on schedule) and **Stop** halts it immediately (verified by the timestamp freezing); the single toggle button correctly flips color/icon/label and the status dot/text in lockstep with the jiggler's actual running state.
+- The app launches, and the dashboard renders correctly with no exceptions, in both light and dark Windows theme.
+- **Start** engages the timer (verified by watching the "last moved at" timestamp advance on schedule) and **Stop** halts it immediately (verified by the timestamp freezing); the single toggle button correctly flips color/icon/label and the status dot/text in lockstep with the jiggler's actual running state — and continues to do so regardless of which settings tab is open.
+- The **Movement** / **Behavior** segmented tabs switch correctly in both directions, each showing its own settings without affecting the other, and without disturbing the always-visible sidebar.
 - Settings changes made in the UI are written to `settings.json` immediately and are reloaded correctly on the next launch.
-- The system tray icon appears with the correct icon/tooltip for each state, its right-click menu items match the running state, left-clicking it restores the window, and its **Exit** command cleanly terminates the process.
+- The system tray icon appears with the correct icon/tooltip for each state, its right-click menu items match the running state, left-clicking it (or choosing "Open Move Mouse") restores the window, and its **Exit** command cleanly terminates the process.
 - Closing the window with "minimize to tray" enabled hides the window while the process keeps running in the background; the window can be restored from the tray.
 - The "Launch at Windows startup" toggle correctly creates and removes the `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` registry value.
 - Exiting the app (via the tray **Exit** command) always completes without errors, having already stopped the jiggler and restored normal power management.

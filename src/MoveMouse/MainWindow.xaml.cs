@@ -55,13 +55,26 @@ public sealed partial class MainWindow : Window
                 // Missing/unreadable icon file should never prevent the window from showing.
             }
 
-            _appWindow.Resize(GetPhysicalSize(hwnd, 480, 780));
+            _appWindow.Resize(GetPhysicalSize(hwnd, 820, 580));
             _appWindow.Closing += OnAppWindowClosing;
 
             if (_appWindow.Presenter is OverlappedPresenter presenter)
             {
                 presenter.IsResizable = true;
                 presenter.IsMaximizable = true;
+
+                try
+                {
+                    // Keep the two-pane layout (sidebar + tabbed settings) from collapsing
+                    // if the user shrinks the window.
+                    presenter.PreferredMinimumWidth = GetPhysicalSize(hwnd, 640, 0).Width;
+                    presenter.PreferredMinimumHeight = GetPhysicalSize(hwnd, 0, 440).Height;
+                }
+                catch
+                {
+                    // Minimum-size enforcement is a nice-to-have; older Windows App SDK
+                    // versions may not expose these properties.
+                }
             }
         }
 

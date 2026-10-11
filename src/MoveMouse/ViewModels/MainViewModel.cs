@@ -87,6 +87,28 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>True when <see cref="ErrorMessage"/> has content, for binding an InfoBar's IsOpen.</summary>
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
+    /// <summary>True while the "Movement" settings tab is the active one.</summary>
+    [ObservableProperty]
+    public partial bool IsMovementTabActive { get; set; } = true;
+
+    /// <summary>True while the "Behavior" settings tab is the active one.</summary>
+    [ObservableProperty]
+    public partial bool IsBehaviorTabActive { get; set; }
+
+    [RelayCommand]
+    private void ShowMovementTab()
+    {
+        IsMovementTabActive = true;
+        IsBehaviorTabActive = false;
+    }
+
+    [RelayCommand]
+    private void ShowBehaviorTab()
+    {
+        IsMovementTabActive = false;
+        IsBehaviorTabActive = true;
+    }
+
     /// <summary>Raised when the user chooses Exit from the window or tray menu.</summary>
     public event EventHandler? ExitRequested;
 

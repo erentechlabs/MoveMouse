@@ -16,283 +16,333 @@
         below instead either uses its implicit default style (no Style attribute, which
         resolves correctly via the framework's built-in per-type styles) or explicit,
         hardcoded property values. This renders identically and still adapts to the
-        system light/dark theme because the built-in control styles themselves are
-        theme-aware; only the few custom colors below are fixed.
+        system light/dark theme because every built-in control's own default appearance
+        is theme-aware; only the few custom accent/panel tint colors are fixed, and those
+        are deliberately low-opacity so the window's Mica backdrop shows through (see
+        MainWindow.xaml.cs) for a modern, translucent look in both themes.
 
-        Layout: a single Start/Stop toggle button (color + icon + label all change
-        together) replaces separate Start/Stop buttons. Every settings row (both
-        Movement and Behavior) shares one consistent two-column grid — a flexible
-        label on the left and a fixed-width control on the right, all right-edge
-        aligned — so the whole card reads as one symmetric, evenly balanced list
-        instead of a mix of stacked header/control pairs.
+        Layout: a wide, horizontal window following modern WinUI patterns — a fixed-width
+        status/control sidebar on the left (always visible) next to a segmented pill tab
+        bar ("Movement" / "Behavior") on the right, so settings are split into focused
+        groups instead of one long scrolling list.
     -->
-    <Grid x:Name="RootGrid">
+    <Grid x:Name="RootGrid" Background="Transparent">
         <Grid.Resources>
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
             <converters:BoolToStatusBrushConverter x:Key="BoolToStatusBrushConverter" />
             <converters:BoolToToggleButtonBrushConverter x:Key="BoolToToggleButtonBrushConverter" />
+            <converters:BoolToTabBrushConverter x:Key="BoolToTabBrushConverter" />
 
-            <SolidColorBrush x:Key="CardBackgroundBrush" Color="#14808080" />
-            <SolidColorBrush x:Key="CardBorderBrush" Color="#29808080" />
-            <SolidColorBrush x:Key="DividerBrush" Color="#1F808080" />
+            <!-- Low-opacity panel tints: translucent enough that the window's Mica
+                 backdrop remains visible through every card, in both light and dark theme. -->
+            <SolidColorBrush x:Key="CardBackgroundBrush" Color="#0F808080" />
+            <SolidColorBrush x:Key="CardBorderBrush" Color="#2E808080" />
+            <SolidColorBrush x:Key="DividerBrush" Color="#22808080" />
             <SolidColorBrush x:Key="ErrorBannerBackgroundBrush" Color="#1FE81123" />
             <SolidColorBrush x:Key="ErrorBannerBorderBrush" Color="#55E81123" />
         </Grid.Resources>
-        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel
-                MaxWidth="520"
-                Margin="24"
-                Spacing="20"
-                HorizontalAlignment="Stretch">
 
-                <!-- Header (centered for a balanced, single-column hero look) -->
-                <StackPanel Orientation="Vertical" Spacing="8" HorizontalAlignment="Center">
-                    <Image Source="Assets/AppIcon.png" Width="40" Height="40" HorizontalAlignment="Center" />
-                    <TextBlock Text="Move Mouse" FontSize="26" FontWeight="SemiBold" HorizontalAlignment="Center" />
+        <Grid Margin="24" RowSpacing="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <Image Source="Assets/AppIcon.png" Width="34" Height="34" />
+                <StackPanel VerticalAlignment="Center" Spacing="0">
+                    <TextBlock Text="Move Mouse" FontSize="22" FontWeight="SemiBold" />
                     <TextBlock
                         Text="Keeps your PC awake with light, configurable cursor activity."
                         FontSize="12"
-                        Opacity="0.8"
-                        HorizontalAlignment="Center"
-                        TextAlignment="Center"
-                        TextWrapping="Wrap"
-                        MaxWidth="360" />
+                        Opacity="0.75" />
                 </StackPanel>
+            </StackPanel>
 
-                <!-- Error / warning banner (hand-built instead of InfoBar, see styling note above) -->
-                <Border
-                    Background="{StaticResource ErrorBannerBackgroundBrush}"
-                    BorderBrush="{StaticResource ErrorBannerBorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="6"
-                    Padding="16,12"
-                    Visibility="{Binding HasError, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <Grid ColumnSpacing="12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock
-                            Grid.Column="0"
-                            Text="{Binding ErrorMessage}"
-                            TextWrapping="Wrap"
-                            VerticalAlignment="Center" />
-                        <Button
-                            Grid.Column="1"
-                            Content="Dismiss"
-                            Command="{Binding DismissErrorCommand}"
-                            VerticalAlignment="Center" />
-                    </Grid>
-                </Border>
+            <!-- Error / warning banner (hand-built instead of InfoBar, see styling note above) -->
+            <Border
+                Grid.Row="1"
+                Background="{StaticResource ErrorBannerBackgroundBrush}"
+                BorderBrush="{StaticResource ErrorBannerBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="16,12"
+                Visibility="{Binding HasError, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        Grid.Column="0"
+                        Text="{Binding ErrorMessage}"
+                        TextWrapping="Wrap"
+                        VerticalAlignment="Center" />
+                    <Button
+                        Grid.Column="1"
+                        Content="Dismiss"
+                        Command="{Binding DismissErrorCommand}"
+                        VerticalAlignment="Center" />
+                </Grid>
+            </Border>
 
-                <!-- Status & control card (centered content for a calm, symmetric focal point) -->
+            <!-- Main: fixed-width status/control sidebar + tabbed settings -->
+            <Grid Grid.Row="2" ColumnSpacing="20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="240" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Sidebar: status + single Start/Stop toggle -->
                 <Border
+                    Grid.Column="0"
                     Background="{StaticResource CardBackgroundBrush}"
                     BorderBrush="{StaticResource CardBorderBrush}"
                     BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="24">
-                    <StackPanel Spacing="16" HorizontalAlignment="Stretch">
-                        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
-                            <Ellipse
-                                Width="14"
-                                Height="14"
-                                VerticalAlignment="Center"
-                                Fill="{Binding IsRunning, Converter={StaticResource BoolToStatusBrushConverter}}" />
-                            <TextBlock Text="{Binding StatusText}" FontSize="18" FontWeight="SemiBold" />
+                    CornerRadius="10"
+                    Padding="20">
+                    <Grid RowSpacing="16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Spacing="12" VerticalAlignment="Top">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Ellipse
+                                    Width="12"
+                                    Height="12"
+                                    VerticalAlignment="Center"
+                                    Fill="{Binding IsRunning, Converter={StaticResource BoolToStatusBrushConverter}}" />
+                                <TextBlock Text="{Binding StatusText}" FontSize="16" FontWeight="SemiBold" />
+                            </StackPanel>
+
+                            <TextBlock Text="{Binding StatusDetailText}" TextWrapping="Wrap" FontSize="13" />
+                            <TextBlock Text="{Binding LastMovedText}" FontSize="12" Opacity="0.7" TextWrapping="Wrap" />
                         </StackPanel>
 
-                        <StackPanel Spacing="4" HorizontalAlignment="Center">
-                            <TextBlock
-                                Text="{Binding StatusDetailText}"
-                                TextWrapping="Wrap"
-                                TextAlignment="Center"
-                                HorizontalAlignment="Center"
-                                MaxWidth="380" />
-                            <TextBlock
-                                Text="{Binding LastMovedText}"
-                                FontSize="12"
-                                Opacity="0.7"
-                                HorizontalAlignment="Center" />
-                        </StackPanel>
-
-                        <!-- Single Start/Stop toggle: one control, color/icon/label all reflect the same state -->
                         <Button
+                            Grid.Row="1"
                             Command="{Binding ToggleJigglingCommand}"
                             Background="{Binding IsRunning, Converter={StaticResource BoolToToggleButtonBrushConverter}}"
                             Foreground="White"
                             HorizontalAlignment="Stretch"
                             HorizontalContentAlignment="Center"
-                            Height="44"
+                            Height="42"
                             CornerRadius="6"
                             AutomationProperties.Name="{Binding ToggleButtonText}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="{Binding ToggleButtonGlyph}" FontSize="14" />
-                                <TextBlock Text="{Binding ToggleButtonText}" FontSize="15" FontWeight="SemiBold" />
+                                <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="{Binding ToggleButtonGlyph}" FontSize="13" />
+                                <TextBlock Text="{Binding ToggleButtonText}" FontSize="14" FontWeight="SemiBold" />
                             </StackPanel>
                         </Button>
-                    </StackPanel>
+                    </Grid>
                 </Border>
 
-                <!-- Settings card: every row is the same two-column grid (flexible label, 160px control,
-                     both columns right/left aligned identically) so Movement and Behavior read as one
-                     evenly balanced list rather than a mix of header-above and label-beside controls. -->
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Settings" FontSize="14" FontWeight="SemiBold" Margin="4,0,0,0" />
+                <!-- Tabbed settings -->
+                <Grid Grid.Column="1" RowSpacing="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Segmented pill tab bar -->
                     <Border
+                        Grid.Row="0"
                         Background="{StaticResource CardBackgroundBrush}"
                         BorderBrush="{StaticResource CardBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="8"
-                        Padding="20">
-                        <StackPanel Spacing="16">
-                            <TextBlock Text="MOVEMENT" FontSize="11" FontWeight="SemiBold" Opacity="0.6" />
-
-                            <Grid ColumnSpacing="16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="176" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Jiggle interval (seconds)" VerticalAlignment="Center" TextWrapping="Wrap" />
-                                <NumberBox
-                                    Grid.Column="1"
-                                    Width="176"
-                                    MinWidth="0"
-                                    Value="{Binding IntervalSeconds, Mode=TwoWay}"
-                                    Minimum="1"
-                                    Maximum="3600"
-                                    SmallChange="5"
-                                    LargeChange="30"
-                                    SpinButtonPlacementMode="Compact"
-                                    AutomationProperties.Name="Jiggle interval in seconds" />
-                            </Grid>
-
-                            <Grid ColumnSpacing="16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="176" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Movement pattern" VerticalAlignment="Center" TextWrapping="Wrap" />
-                                <ComboBox
-                                    Grid.Column="1"
-                                    Width="176"
-                                    MinWidth="0"
-                                    ItemsSource="{Binding MovementModes}"
-                                    SelectedItem="{Binding SelectedMovementMode, Mode=TwoWay}"
-                                    DisplayMemberPath="DisplayName"
-                                    AutomationProperties.Name="Movement pattern" />
-                            </Grid>
-
-                            <Grid ColumnSpacing="16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="176" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Movement distance (pixels)" VerticalAlignment="Center" TextWrapping="Wrap" />
-                                <NumberBox
-                                    Grid.Column="1"
-                                    Width="176"
-                                    MinWidth="0"
-                                    Value="{Binding MovementDistance, Mode=TwoWay}"
-                                    Minimum="1"
-                                    Maximum="100"
-                                    SmallChange="1"
-                                    LargeChange="10"
-                                    SpinButtonPlacementMode="Compact"
-                                    AutomationProperties.Name="Movement distance in pixels" />
-                            </Grid>
-
-                            <Rectangle Height="1" Fill="{StaticResource DividerBrush}" Margin="0,2,0,2" />
-
-                            <TextBlock Text="BEHAVIOR" FontSize="11" FontWeight="SemiBold" Opacity="0.6" />
-
-                            <Grid ColumnSpacing="16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="176" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Keep the display on while running" VerticalAlignment="Center" TextWrapping="Wrap" />
-                                <ToggleSwitch
-                                    Grid.Column="1"
-                                    IsOn="{Binding KeepDisplayOn, Mode=TwoWay}"
-                                    OnContent=""
-                                    OffContent=""
-                                    HorizontalAlignment="Right"
-                                    AutomationProperties.Name="Keep the display on while running" />
-                            </Grid>
-
-                            <Grid ColumnSpacing="16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="176" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Minimize to the system tray when closing the window" VerticalAlignment="Center" TextWrapping="Wrap" />
-                                <ToggleSwitch
-                                    Grid.Column="1"
-                                    IsOn="{Binding MinimizeToTrayOnClose, Mode=TwoWay}"
-                                    OnContent=""
-                                    OffContent=""
-                                    HorizontalAlignment="Right"
-                                    AutomationProperties.Name="Minimize to the system tray when closing the window" />
-                            </Grid>
-
-                            <Grid ColumnSpacing="16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="176" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Start minimized to the system tray" VerticalAlignment="Center" TextWrapping="Wrap" />
-                                <ToggleSwitch
-                                    Grid.Column="1"
-                                    IsOn="{Binding StartMinimizedToTray, Mode=TwoWay}"
-                                    OnContent=""
-                                    OffContent=""
-                                    HorizontalAlignment="Right"
-                                    AutomationProperties.Name="Start minimized to the system tray" />
-                            </Grid>
-
-                            <Grid ColumnSpacing="16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="176" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Start jiggling automatically when the app launches" VerticalAlignment="Center" TextWrapping="Wrap" />
-                                <ToggleSwitch
-                                    Grid.Column="1"
-                                    IsOn="{Binding AutoStartJigglingOnLaunch, Mode=TwoWay}"
-                                    OnContent=""
-                                    OffContent=""
-                                    HorizontalAlignment="Right"
-                                    AutomationProperties.Name="Start jiggling automatically when the app launches" />
-                            </Grid>
-
-                            <Grid ColumnSpacing="16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="176" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Launch Move Mouse when I sign in to Windows" VerticalAlignment="Center" TextWrapping="Wrap" />
-                                <ToggleSwitch
-                                    Grid.Column="1"
-                                    IsOn="{Binding LaunchAtWindowsStartup, Mode=TwoWay}"
-                                    OnContent=""
-                                    OffContent=""
-                                    HorizontalAlignment="Right"
-                                    AutomationProperties.Name="Launch Move Mouse when I sign in to Windows" />
-                            </Grid>
+                        Padding="4"
+                        HorizontalAlignment="Left">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <Button
+                                Content="Movement"
+                                Command="{Binding ShowMovementTabCommand}"
+                                Background="{Binding IsMovementTabActive, Converter={StaticResource BoolToTabBrushConverter}}"
+                                BorderThickness="0"
+                                CornerRadius="6"
+                                Padding="18,8"
+                                AutomationProperties.Name="Movement settings tab" />
+                            <Button
+                                Content="Behavior"
+                                Command="{Binding ShowBehaviorTabCommand}"
+                                Background="{Binding IsBehaviorTabActive, Converter={StaticResource BoolToTabBrushConverter}}"
+                                BorderThickness="0"
+                                CornerRadius="6"
+                                Padding="18,8"
+                                AutomationProperties.Name="Behavior settings tab" />
                         </StackPanel>
                     </Border>
-                </StackPanel>
 
-                <TextBlock
-                    Text="Closing this window keeps Move Mouse running in the system tray (unless disabled above). Use the tray icon's Exit command to fully quit."
-                    FontSize="12"
-                    Opacity="0.7"
-                    TextWrapping="Wrap"
-                    TextAlignment="Center"
-                    HorizontalAlignment="Center"
-                    MaxWidth="440" />
-            </StackPanel>
-        </ScrollViewer>
+                    <!-- Tab content: both panels occupy the same cell; only the active one is visible -->
+                    <Grid Grid.Row="1">
+                        <Border
+                            Background="{StaticResource CardBackgroundBrush}"
+                            BorderBrush="{StaticResource CardBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20"
+                            VerticalAlignment="Top"
+                            Visibility="{Binding IsMovementTabActive, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel Spacing="16">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="176" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Jiggle interval (seconds)" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    <NumberBox
+                                        Grid.Column="1"
+                                        Width="176"
+                                        MinWidth="0"
+                                        Value="{Binding IntervalSeconds, Mode=TwoWay}"
+                                        Minimum="1"
+                                        Maximum="3600"
+                                        SmallChange="5"
+                                        LargeChange="30"
+                                        SpinButtonPlacementMode="Compact"
+                                        AutomationProperties.Name="Jiggle interval in seconds" />
+                                </Grid>
+
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="176" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Movement pattern" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    <ComboBox
+                                        Grid.Column="1"
+                                        Width="176"
+                                        MinWidth="0"
+                                        ItemsSource="{Binding MovementModes}"
+                                        SelectedItem="{Binding SelectedMovementMode, Mode=TwoWay}"
+                                        DisplayMemberPath="DisplayName"
+                                        AutomationProperties.Name="Movement pattern" />
+                                </Grid>
+
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="176" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Movement distance (pixels)" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    <NumberBox
+                                        Grid.Column="1"
+                                        Width="176"
+                                        MinWidth="0"
+                                        Value="{Binding MovementDistance, Mode=TwoWay}"
+                                        Minimum="1"
+                                        Maximum="100"
+                                        SmallChange="1"
+                                        LargeChange="10"
+                                        SpinButtonPlacementMode="Compact"
+                                        AutomationProperties.Name="Movement distance in pixels" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border
+                            Background="{StaticResource CardBackgroundBrush}"
+                            BorderBrush="{StaticResource CardBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20"
+                            VerticalAlignment="Top"
+                            Visibility="{Binding IsBehaviorTabActive, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel Spacing="14">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="176" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Keep the display on while running" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    <ToggleSwitch
+                                        Grid.Column="1"
+                                        IsOn="{Binding KeepDisplayOn, Mode=TwoWay}"
+                                        OnContent=""
+                                        OffContent=""
+                                        HorizontalAlignment="Right"
+                                        AutomationProperties.Name="Keep the display on while running" />
+                                </Grid>
+
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="176" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Minimize to the system tray when closing the window" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    <ToggleSwitch
+                                        Grid.Column="1"
+                                        IsOn="{Binding MinimizeToTrayOnClose, Mode=TwoWay}"
+                                        OnContent=""
+                                        OffContent=""
+                                        HorizontalAlignment="Right"
+                                        AutomationProperties.Name="Minimize to the system tray when closing the window" />
+                                </Grid>
+
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="176" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Start minimized to the system tray" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    <ToggleSwitch
+                                        Grid.Column="1"
+                                        IsOn="{Binding StartMinimizedToTray, Mode=TwoWay}"
+                                        OnContent=""
+                                        OffContent=""
+                                        HorizontalAlignment="Right"
+                                        AutomationProperties.Name="Start minimized to the system tray" />
+                                </Grid>
+
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="176" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Start jiggling automatically when the app launches" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    <ToggleSwitch
+                                        Grid.Column="1"
+                                        IsOn="{Binding AutoStartJigglingOnLaunch, Mode=TwoWay}"
+                                        OnContent=""
+                                        OffContent=""
+                                        HorizontalAlignment="Right"
+                                        AutomationProperties.Name="Start jiggling automatically when the app launches" />
+                                </Grid>
+
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="176" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Launch Move Mouse when I sign in to Windows" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    <ToggleSwitch
+                                        Grid.Column="1"
+                                        IsOn="{Binding LaunchAtWindowsStartup, Mode=TwoWay}"
+                                        OnContent=""
+                                        OffContent=""
+                                        HorizontalAlignment="Right"
+                                        AutomationProperties.Name="Launch Move Mouse when I sign in to Windows" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <!-- Footer -->
+            <TextBlock
+                Grid.Row="3"
+                Text="Closing this window keeps Move Mouse running in the system tray (unless disabled in Behavior). Use the tray icon's Exit command to fully quit."
+                FontSize="11"
+                Opacity="0.65"
+                TextWrapping="Wrap"
+                HorizontalAlignment="Center"
+                TextAlignment="Center" />
+        </Grid>
     </Grid>
 </Window>
